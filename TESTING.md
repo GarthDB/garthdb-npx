@@ -18,8 +18,9 @@ https://github.com/moonrepo/proto/issues/930
    - Workflow: `release.yml`
    - Environment: (production or leave blank)
 
-3. **GitHub Secrets Required**
-   - `NPM_TOKEN`: Not needed for OIDC, but kept for fallback
+3. **GitHub Secrets**
+   - **None required!** OIDC authentication eliminates the need for `NPM_TOKEN`
+   - The workflow uses `id-token: write` permission to authenticate with npm
 
 ## Workflows
 
