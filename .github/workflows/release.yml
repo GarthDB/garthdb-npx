@@ -31,6 +31,32 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Debug OIDC Environment Variables
+        run: |
+          echo "=== OIDC Environment Variables ==="
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-NOT SET}"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN present: $([ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ] && echo "YES" || echo "NO")"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN length: ${#ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
+          echo ""
+          echo "=== npm Configuration ==="
+          echo "npm version: $(npm --version)"
+          echo "npm path: $(which npm)"
+          echo ""
+          echo "=== Environment Variables (filtered) ==="
+          env | grep -i "ACTIONS\|NPM\|NODE" | sort || true
+
+      - name: Debug npm publish (dry-run)
+        run: |
+          echo "=== Testing npm publish with dry-run ==="
+          npm publish --dry-run 2>&1 || echo "Exit code: $?"
+        continue-on-error: true
+
+      - name: Debug npm whoami (check auth status)
+        run: |
+          echo "=== Checking npm authentication status ==="
+          npm whoami 2>&1 || echo "Not authenticated (exit code: $?)"
+        continue-on-error: true
+
       - name: Create Release Pull Request or Publish
         uses: changesets/action@v1
         with:
