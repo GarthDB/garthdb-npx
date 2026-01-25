@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   release:
-    name: Release with Proto
+    name: Release without Proto
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -20,61 +20,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup proto toolchain
-        uses: moonrepo/setup-toolchain@v0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          auto-install: true
+          node-version: '20.17.0'
+          registry-url: 'https://registry.npmjs.org'
 
-      - name: Find npm binary path
-        id: npm-path
-        run: |
-          # Try to find npm binary in proto's installation directories
-          # Prefer actual binaries over shims
-          NPM_BIN=""
-          
-          # First try ~/.proto/bin/npm (symlink to actual binary)
-          if [ -f ~/.proto/bin/npm ] && [ ! -L ~/.proto/bin/npm ] || [ -L ~/.proto/bin/npm ]; then
-            # Check if it's a symlink pointing to bin (not shims)
-            TARGET=$(readlink -f ~/.proto/bin/npm 2>/dev/null || echo "")
-            if [ -n "$TARGET" ] && [[ "$TARGET" != *"/shims/"* ]]; then
-              NPM_BIN="$HOME/.proto/bin/npm"
-            fi
-          fi
-          
-          # If not found, look for actual binary in tools directory (prefer bin/ over shims/)
-          if [ -z "$NPM_BIN" ] && [ -d ~/.proto/tools/npm ]; then
-            # Find bin/npm first (actual binary) - explicitly search for bin/npm
-            for VERSION_DIR in ~/.proto/tools/npm/*/; do
-              if [ -f "${VERSION_DIR}bin/npm" ]; then
-                NPM_BIN="${VERSION_DIR}bin/npm"
-                break
-              fi
-            done
-            # If still not found, try find but exclude shims
-            if [ -z "$NPM_BIN" ]; then
-              NPM_BIN=$(find ~/.proto/tools/npm -path "*/bin/npm" -type f 2>/dev/null | head -1)
-            fi
-          fi
-          
-          if [ -z "$NPM_BIN" ]; then
-            echo "Could not find npm binary, falling back to proto run"
-            NPM_BIN="proto run npm --"
-          else
-            echo "Found npm binary at: $NPM_BIN"
-            # Verify it's not a shim
-            if [[ "$NPM_BIN" == *"/shims/"* ]]; then
-              echo "Warning: Found shim instead of binary, this may still fail"
-            fi
-          fi
-          
-          echo "npm_bin=$NPM_BIN" >> $GITHUB_OUTPUT
-          echo "npm_path=$NPM_BIN"
+      - name: Install npm 11.6.2
+        # npm 11.5.1+ required for OIDC support
+        # setup-node doesn't support npm-version input, so we install separately
+        run: npm install -g npm@11.6.2
 
       - name: Install dependencies
-        run: ${{ steps.npm-path.outputs.npm_bin }} install
+        run: npm install
 
       - name: Build
-        run: ${{ steps.npm-path.outputs.npm_bin }} run build
+        run: npm run build
 
       - name: Debug OIDC Environment Variables
         run: |
@@ -84,38 +45,28 @@ jobs:
           echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN length: ${#ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
           echo ""
           echo "=== npm Configuration ==="
-          echo "npm version: $(${{ steps.npm-path.outputs.npm_bin }} --version)"
-          echo "npm binary path: ${{ steps.npm-path.outputs.npm_bin }}"
-          echo "npm binary exists: $([ -f '${{ steps.npm-path.outputs.npm_bin }}' ] && echo 'YES' || echo 'NO')"
-          echo ""
-          echo "=== Proto Installation Paths ==="
-          echo "~/.proto/bin contents:"
-          ls -la ~/.proto/bin/ 2>/dev/null | grep -E "npm|node" || echo "No npm/node found"
-          echo ""
-          echo "~/.proto/tools/npm contents:"
-          find ~/.proto/tools/npm -type f -name "npm" 2>/dev/null | head -5 || echo "No npm found in tools"
-          echo ""
-          echo "shim path: $(which npm || echo 'N/A')"
+          echo "npm version: $(npm --version)"
+          echo "npm path: $(which npm)"
           echo ""
           echo "=== Environment Variables (filtered) ==="
           env | grep -i "ACTIONS\|NPM\|NODE" | sort || true
 
       - name: Debug npm publish (dry-run)
         run: |
-          echo "=== Testing npm publish with dry-run (direct binary) ==="
-          ${{ steps.npm-path.outputs.npm_bin }} publish --dry-run 2>&1 || echo "Exit code: $?"
+          echo "=== Testing npm publish with dry-run (without proto) ==="
+          npm publish --dry-run 2>&1 || echo "Exit code: $?"
         continue-on-error: true
 
       - name: Debug npm whoami (check auth status)
         run: |
-          echo "=== Checking npm authentication status (direct binary) ==="
-          ${{ steps.npm-path.outputs.npm_bin }} whoami 2>&1 || echo "Not authenticated (exit code: $?)"
+          echo "=== Checking npm authentication status (without proto) ==="
+          npm whoami 2>&1 || echo "Not authenticated (exit code: $?)"
         continue-on-error: true
 
       - name: Create Release Pull Request or Publish
         uses: changesets/action@v1
         with:
-          publish: ${{ steps.npm-path.outputs.npm_bin }} run release
+          publish: npm run release
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
