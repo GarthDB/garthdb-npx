@@ -29,12 +29,31 @@ jobs:
         id: npm-path
         run: |
           # Try to find npm binary in proto's installation directories
+          # Prefer actual binaries over shims
           NPM_BIN=""
-          if [ -f ~/.proto/bin/npm ]; then
-            NPM_BIN="$HOME/.proto/bin/npm"
-          elif [ -d ~/.proto/tools/npm ]; then
-            # Find the versioned npm binary
-            NPM_BIN=$(find ~/.proto/tools/npm -name "npm" -type f 2>/dev/null | head -1)
+          
+          # First try ~/.proto/bin/npm (symlink to actual binary)
+          if [ -f ~/.proto/bin/npm ] && [ ! -L ~/.proto/bin/npm ] || [ -L ~/.proto/bin/npm ]; then
+            # Check if it's a symlink pointing to bin (not shims)
+            TARGET=$(readlink -f ~/.proto/bin/npm 2>/dev/null || echo "")
+            if [ -n "$TARGET" ] && [[ "$TARGET" != *"/shims/"* ]]; then
+              NPM_BIN="$HOME/.proto/bin/npm"
+            fi
+          fi
+          
+          # If not found, look for actual binary in tools directory (prefer bin/ over shims/)
+          if [ -z "$NPM_BIN" ] && [ -d ~/.proto/tools/npm ]; then
+            # Find bin/npm first (actual binary) - explicitly search for bin/npm
+            for VERSION_DIR in ~/.proto/tools/npm/*/; do
+              if [ -f "${VERSION_DIR}bin/npm" ]; then
+                NPM_BIN="${VERSION_DIR}bin/npm"
+                break
+              fi
+            done
+            # If still not found, try find but exclude shims
+            if [ -z "$NPM_BIN" ]; then
+              NPM_BIN=$(find ~/.proto/tools/npm -path "*/bin/npm" -type f 2>/dev/null | head -1)
+            fi
           fi
           
           if [ -z "$NPM_BIN" ]; then
@@ -42,6 +61,10 @@ jobs:
             NPM_BIN="proto run npm --"
           else
             echo "Found npm binary at: $NPM_BIN"
+            # Verify it's not a shim
+            if [[ "$NPM_BIN" == *"/shims/"* ]]; then
+              echo "Warning: Found shim instead of binary, this may still fail"
+            fi
           fi
           
           echo "npm_bin=$NPM_BIN" >> $GITHUB_OUTPUT
