@@ -32,6 +32,31 @@
 - **Error**: `Cannot find module '/home/runner/.proto/tools/node/20.17.0/bin/node_modules/npm/bin/npm-prefix.js'`
 - **Finding**: npm binaries installed by proto have dependencies on proto's environment setup and cannot be called directly without proto's runtime context
 
+### Test 5: Without Proto (Control Test)
+- **Workflow Run**: https://github.com/GarthDB/garthdb-npx/actions/runs/21341669370
+- **Commit**: `293cd9d` - "fix: use correct version tag v1.6.8 for changesets-action fork"
+- **Date**: January 25, 2026
+- **Method**: Using `actions/setup-node@v4` directly (no proto)
+- **Changesets Action**: `garthdb/changesets-action@v1.6.8` with `oidcAuth: true`
+- **Result**: ✅ SUCCESS - OIDC authentication working correctly
+- **Finding**: Confirmed OIDC works when proto is not involved
+
+### Test 6: With Proto + Forked Changesets Action (Initial Attempt)
+- **Workflow Run**: https://github.com/GarthDB/garthdb-npx/actions/runs/21341669373
+- **Commit**: `293cd9d` - "fix: use correct version tag v1.6.8 for changesets-action fork"
+- **Date**: January 25, 2026
+- **Method**: Using `proto run npm -- run release` with `garthdb/changesets-action@v1.6.8`
+- **Result**: ❌ FAILED - Still `ENEEDAUTH` error
+- **Finding**: Even with the fork that explicitly passes OIDC env vars, nested npm scripts lose the variables
+
+### Test 7: With Proto + Direct Changeset Publish Call (SOLUTION)
+- **Workflow Run**: https://github.com/GarthDB/garthdb-npx/actions/runs/21341680402
+- **Commit**: `af2c01b` - "test: call changeset publish directly with proto to reduce nesting"
+- **Date**: January 25, 2026
+- **Method**: Using `proto run npm -- run build && proto run npx -- changeset publish` with `garthdb/changesets-action@v1.6.8`
+- **Result**: ✅ SUCCESS - OIDC authentication working correctly with proto!
+- **Solution**: Calling `changeset publish` directly instead of through `npm run release` reduces process nesting and allows OIDC variables to propagate
+
 ## Environment Configuration
 
 ### OIDC Environment Variables Status
@@ -97,12 +122,22 @@ Even though OIDC environment variables (`ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTI
 2. **The problem is deeper than just the shim mechanism**
 3. **Environment variables are lost somewhere in proto's execution chain**, regardless of whether shims or `proto run` are used
 
-### Conclusion
-**Proto is blocking OIDC environment variables from reaching npm** in multiple ways:
+### Conclusion (Initial Analysis)
+**Proto was blocking OIDC environment variables from reaching npm** in multiple ways:
 - ❌ Via shims: `npm` → shim → `proto run` → binary (fails)
 - ❌ Via `proto run`: `proto run npm --` → binary (also fails)
+- ❌ Via nested npm scripts: `proto run npm -- run release` → `npm run build && changeset publish` → `npm publish` (fails)
 
-Both execution paths lose the OIDC variables, suggesting a fundamental issue with proto's environment variable handling, not just the shims.
+The issue was that nested process chains (especially through npm scripts) were losing OIDC environment variables.
+
+### Solution
+**✅ RESOLVED** - The solution was to:
+1. Use the forked `garthdb/changesets-action@v1.6.8` which explicitly passes OIDC environment variables
+2. Reduce process nesting by calling `changeset publish` directly instead of through npm scripts:
+   - ❌ `proto run npm -- run release` (nested: npm → npm script → changeset → npm)
+   - ✅ `proto run npm -- run build && proto run npx -- changeset publish` (direct: proto → changeset → npm)
+
+This approach ensures OIDC environment variables propagate through proto's process chain successfully.
 
 ## Debug Output
 
@@ -132,14 +167,74 @@ Not authenticated (exit code: 1)
 npm warn This command requires you to be logged in to https://registry.npmjs.org/ (dry-run)
 ```
 
-## Related Issue
-https://github.com/moonrepo/proto/issues/930
+## Related Issues and Resources
+
+- **Proto Issue**: https://github.com/moonrepo/proto/issues/930
+- **Forked Changesets Action**: https://github.com/GarthDB/changesets-action
+- **Fork Release (v1.6.8)**: https://github.com/GarthDB/changesets-action/releases/tag/v1.6.8
+- **npm Trusted Publishing Docs**: https://docs.npmjs.com/trusted-publishers
+
+## Key Learnings
+
+1. **OIDC environment variables must be explicitly passed** through nested process chains
+2. **Proto shims and `proto run` both require explicit environment variable passing** when used with nested commands
+3. **Reducing process nesting** (calling `changeset publish` directly instead of through npm scripts) significantly improves OIDC variable propagation
+4. **The forked changesets-action** (`garthdb/changesets-action@v1.6.8`) solves this by explicitly passing OIDC variables to the exec() call
+5. **Both workflows (with and without proto) now work** with the correct configuration
+
+## Solution Implementation
+
+### Required Changes
+
+1. **Use forked changesets-action**: `garthdb/changesets-action@v1.6.8`
+   - This fork explicitly passes OIDC environment variables to the publish command
+   - Release notes: https://github.com/GarthDB/changesets-action/releases/tag/v1.6.8
+
+2. **Enable OIDC in workflow**:
+   ```yaml
+   uses: garthdb/changesets-action@v1.6.8
+   with:
+     oidcAuth: true
+   ```
+
+3. **Reduce process nesting** (for proto workflows):
+   ```yaml
+   # ❌ Don't use nested npm scripts
+   publish: proto run npm -- run release
+   
+   # ✅ Call changeset publish directly
+   publish: proto run npm -- run build && proto run npx -- changeset publish
+   ```
+
+### Working Configuration
+
+**Without Proto** (`release.yml`):
+```yaml
+- name: Create Release Pull Request or Publish
+  uses: garthdb/changesets-action@v1.6.8
+  with:
+    publish: npm run build && npx changeset publish
+    oidcAuth: true
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**With Proto** (`release-with-proto.yml`):
+```yaml
+- name: Create Release Pull Request or Publish
+  uses: garthdb/changesets-action@v1.6.8
+  with:
+    publish: proto run npm -- run build && proto run npx -- changeset publish
+    oidcAuth: true
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
 
 ## Next Steps
-1. ✅ Test with proto but without shims (using `proto run npm --`) - **FAILED**
-2. ⏳ Test with direct binary paths (`~/.proto/bin/npm` or `~/.proto/tools/npm/...`) - **IN PROGRESS**
-3. ⏳ Compare results with workflow that bypasses proto completely (`release-no-proto.yml`)
-4. ⏳ Document findings in the proto issue
+1. ✅ Test with proto but without shims (using `proto run npm --`) - **FAILED initially, then SUCCEEDED with solution**
+2. ✅ Test with direct binary paths (`~/.proto/bin/npm` or `~/.proto/tools/npm/...`) - **COMPLETED**
+3. ✅ Compare results with workflow that bypasses proto completely - **COMPLETED - Both work!**
+4. ⏳ Document findings in the proto issue (https://github.com/moonrepo/proto/issues/930)
 
 ## Test Results Summary
 
@@ -149,4 +244,19 @@ https://github.com/moonrepo/proto/issues/930
 | Proto Run (`proto run npm --`) | ✅ Yes | ❌ FAILED | ENEEDAUTH error - **Critical finding** |
 | Direct Binary Path (found shim) | ✅ Yes | ❌ FAILED | Found shim instead of binary - **Issue with binary discovery** |
 | Direct Binary (`~/.proto/tools/npm/*/bin/npm`) | ✅ Yes | ❌ FAILED | Binary found but cannot run standalone - **Requires proto environment** |
-| Without Proto (`actions/setup-node`) | ⏳ Testing | ⏳ Pending | Expected to work - **Next test** |
+| Without Proto (`actions/setup-node`) | ✅ Yes | ✅ SUCCESS | OIDC works correctly - **Confirmed working** |
+| Proto + Fork (`proto run npm -- run release`) | ✅ Yes | ❌ FAILED | Nested npm scripts still lose env vars |
+| Proto + Fork + Direct Call | ✅ Yes | ✅ SUCCESS | **SOLUTION: Direct changeset publish call** |
+
+## Successful Workflow Runs
+
+### Without Proto
+- **Run**: https://github.com/GarthDB/garthdb-npx/actions/runs/21341669370
+- **Status**: ✅ Success
+- **Action**: `garthdb/changesets-action@v1.6.8` with `oidcAuth: true`
+
+### With Proto (Solution)
+- **Run**: https://github.com/GarthDB/garthdb-npx/actions/runs/21341680402
+- **Status**: ✅ Success
+- **Action**: `garthdb/changesets-action@v1.6.8` with `oidcAuth: true`
+- **Command**: `proto run npm -- run build && proto run npx -- changeset publish`
