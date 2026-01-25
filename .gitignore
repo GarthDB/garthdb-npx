@@ -74,3 +74,10 @@ typings/
 
 # FuseBox cache
 .fusebox/
+
+# Proto
+.proto
+
+# Changesets
+.changeset/*.md
+!.changeset/config.json
