@@ -25,6 +25,8 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install npm 11.6.2
+        # npm 11.5.1+ required for OIDC support
+        # setup-node doesn't support npm-version input, so we install separately
         run: npm install -g npm@11.6.2
 
       - name: Install dependencies
@@ -41,4 +43,4 @@ jobs:
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # NPM_TOKEN not needed with OIDC trusted publishing
