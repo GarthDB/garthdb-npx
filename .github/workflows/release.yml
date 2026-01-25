@@ -63,12 +63,21 @@ jobs:
           npm whoami 2>&1 || echo "Not authenticated (exit code: $?)"
         continue-on-error: true
 
+      - name: Debug direct npm publish (test OIDC)
+        run: |
+          echo "=== Testing direct npm publish with OIDC ==="
+          echo "OIDC URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-NOT SET}"
+          echo "OIDC Token present: $([ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ] && echo "YES" || echo "NO")"
+          npm publish --dry-run 2>&1 | tail -10
+        continue-on-error: true
+
       - name: Create Release Pull Request or Publish
         uses: changesets/action@v1
         with:
-          publish: npm run release
+          publish: npm run build && npx changeset publish
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NPM_TOKEN not needed with OIDC trusted publishing
+          # OIDC environment variables are automatically available to all steps
