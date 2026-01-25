@@ -23,6 +23,15 @@
 - **Issue**: Found `/home/runner/.proto/tools/npm/11.6.2/shims/npm` (shim) instead of `/home/runner/.proto/tools/npm/11.6.2/bin/npm` (actual binary)
 - **Result**: ❌ FAILED - Still cannot authenticate (was using shim)
 
+### Test 4: With Direct Binary Path (Found Actual Binary)
+- **Workflow Run**: https://github.com/GarthDB/garthdb-npx/actions/runs/21341546336
+- **Commit**: `844292e` - "docs: update error details with Test 3 findings"
+- **Date**: January 25, 2026
+- **Method**: Using direct path to actual npm binary `/home/runner/.proto/tools/npm/11.6.2/bin/npm`
+- **Result**: ❌ FAILED - Binary cannot run standalone (requires proto environment)
+- **Error**: `Cannot find module '/home/runner/.proto/tools/node/20.17.0/bin/node_modules/npm/bin/npm-prefix.js'`
+- **Finding**: npm binaries installed by proto have dependencies on proto's environment setup and cannot be called directly without proto's runtime context
+
 ## Environment Configuration
 
 ### OIDC Environment Variables Status
@@ -139,5 +148,5 @@ https://github.com/moonrepo/proto/issues/930
 | Proto Shims (`npm` via PATH) | ✅ Yes | ❌ FAILED | ENEEDAUTH error |
 | Proto Run (`proto run npm --`) | ✅ Yes | ❌ FAILED | ENEEDAUTH error - **Critical finding** |
 | Direct Binary Path (found shim) | ✅ Yes | ❌ FAILED | Found shim instead of binary - **Issue with binary discovery** |
-| Direct Binary (`~/.proto/tools/npm/*/bin/npm`) | ⏳ Testing | ⏳ Pending | Updated to explicitly prefer bin/ over shims/ |
-| Without Proto (`actions/setup-node`) | ⏳ Testing | ⏳ Pending | Expected to work |
+| Direct Binary (`~/.proto/tools/npm/*/bin/npm`) | ✅ Yes | ❌ FAILED | Binary found but cannot run standalone - **Requires proto environment** |
+| Without Proto (`actions/setup-node`) | ⏳ Testing | ⏳ Pending | Expected to work - **Next test** |
