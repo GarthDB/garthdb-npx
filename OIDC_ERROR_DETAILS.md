@@ -1,9 +1,18 @@
-# OIDC Authentication Failure with Proto Shims
+# OIDC Authentication Failure with Proto
 
 ## Test Run Details
+
+### Test 1: With Proto Shims
 - **Workflow Run**: https://github.com/GarthDB/garthdb-npx/actions/runs/21340297101
 - **Commit**: `8e40a8e` - "debug: add steps to capture OIDC error details"
 - **Date**: January 25, 2026
+- **Method**: Using proto shims (`npm` via PATH → `/home/runner/.proto/shims/npm`)
+
+### Test 2: With Proto Run (Bypassing Shims)
+- **Workflow Run**: https://github.com/GarthDB/garthdb-npx/actions/runs/21341477050
+- **Commit**: `9d5dd3f` - "fix: use correct proto run syntax with -- separator"
+- **Date**: January 25, 2026
+- **Method**: Using `proto run npm --` (bypassing shims, but still using proto runtime)
 
 ## Environment Configuration
 
@@ -44,9 +53,11 @@ npm error need auth You need to authorize this machine using `npm adduser`
 ## Root Cause Analysis
 
 ### The Problem
-Even though OIDC environment variables (`ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN`) are present in the GitHub Actions environment, npm cannot authenticate when called through proto shims.
+Even though OIDC environment variables (`ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN`) are present in the GitHub Actions environment, npm cannot authenticate when called through proto, regardless of whether shims or `proto run` are used.
 
 ### Evidence
+
+#### Test 1: With Proto Shims
 1. ✅ OIDC environment variables are present and accessible in the shell
 2. ✅ npm 11.6.2 is installed (supports OIDC)
 3. ✅ Workflow has `id-token: write` permission
@@ -54,8 +65,26 @@ Even though OIDC environment variables (`ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTI
 5. ❌ npm authentication fails when called via `/home/runner/.proto/shims/npm`
 6. ❌ Error occurs even though environment variables are present
 
+#### Test 2: With Proto Run (Bypassing Shims)
+1. ✅ OIDC environment variables are present and accessible in the shell
+2. ✅ npm 11.6.2 is installed (supports OIDC)
+3. ✅ Using `proto run npm --` bypasses shims
+4. ❌ **npm authentication STILL fails** with `ENEEDAUTH` error
+5. ❌ `proto run npm -- whoami` fails even though environment variables are present
+
+### Critical Discovery
+**The issue is NOT limited to proto shims.** Even when using `proto run npm --` (which bypasses shims), npm still cannot authenticate. This indicates:
+
+1. **Proto's `run` command is also not preserving OIDC environment variables**
+2. **The problem is deeper than just the shim mechanism**
+3. **Environment variables are lost somewhere in proto's execution chain**, regardless of whether shims or `proto run` are used
+
 ### Conclusion
-**Proto shims are blocking OIDC environment variables from reaching npm.** The shim → `proto run` → actual binary process chain loses the OIDC variables along the way, even though other environment variables seem to make it through.
+**Proto is blocking OIDC environment variables from reaching npm** in multiple ways:
+- ❌ Via shims: `npm` → shim → `proto run` → binary (fails)
+- ❌ Via `proto run`: `proto run npm --` → binary (also fails)
+
+Both execution paths lose the OIDC variables, suggesting a fundamental issue with proto's environment variable handling, not just the shims.
 
 ## Debug Output
 
@@ -89,6 +118,16 @@ npm warn This command requires you to be logged in to https://registry.npmjs.org
 https://github.com/moonrepo/proto/issues/930
 
 ## Next Steps
-1. Test with proto but without shims (using `proto run npm` directly)
-2. Compare results with workflow that bypasses proto completely
-3. Document findings in the proto issue
+1. ✅ Test with proto but without shims (using `proto run npm --`) - **FAILED**
+2. ⏳ Test with direct binary paths (`~/.proto/bin/npm` or `~/.proto/tools/npm/...`) - **IN PROGRESS**
+3. ⏳ Compare results with workflow that bypasses proto completely (`release-no-proto.yml`)
+4. ⏳ Document findings in the proto issue
+
+## Test Results Summary
+
+| Method | OIDC Variables Present | Authentication Result | Notes |
+|--------|------------------------|----------------------|-------|
+| Proto Shims (`npm` via PATH) | ✅ Yes | ❌ FAILED | ENEEDAUTH error |
+| Proto Run (`proto run npm --`) | ✅ Yes | ❌ FAILED | ENEEDAUTH error - **Critical finding** |
+| Direct Binary (`~/.proto/bin/npm`) | ⏳ Testing | ⏳ Pending | Next test |
+| Without Proto (`actions/setup-node`) | ⏳ Testing | ⏳ Pending | Expected to work |
