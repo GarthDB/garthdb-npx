@@ -24,7 +24,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.17.0'
-          registry-url: 'https://registry.npmjs.org'
+          # Do NOT set registry-url - it enables token-based auth which overrides OIDC
 
       - name: Install npm 11.6.2
         # npm 11.5.1+ required for OIDC support
