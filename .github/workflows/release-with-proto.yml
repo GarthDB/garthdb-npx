@@ -58,9 +58,10 @@ jobs:
         continue-on-error: true
 
       - name: Create Release Pull Request or Publish
-        uses: changesets/action@v1
+        uses: garthdb/changesets-action@v1
         with:
           publish: proto run npm -- run release
+          oidcAuth: true  # Enable OIDC authentication
           title: "chore: version packages"
           commit: "chore: version packages"
         env:

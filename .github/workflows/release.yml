@@ -72,12 +72,12 @@ jobs:
         continue-on-error: true
 
       - name: Create Release Pull Request or Publish
-        uses: changesets/action@v1
+        uses: garthdb/changesets-action@v1
         with:
           publish: npm run build && npx changeset publish
+          oidcAuth: true  # Enable OIDC authentication
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NPM_TOKEN not needed with OIDC trusted publishing
-          # OIDC environment variables are automatically available to all steps
