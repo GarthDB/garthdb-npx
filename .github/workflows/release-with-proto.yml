@@ -52,11 +52,11 @@ jobs:
         uses: garthdb/changesets-action@v1.6.8
         with:
           # Use 'npm exec' instead of 'npx' to ensure proto's npm (11.6.2) is used, not Node's bundled npm
-          publish: proto run npm -- exec changeset publish --verbose
+          # CRITICAL: Use 'npm exec' NOT 'npx' - npx uses Node's bundled npm (10.x) which lacks OIDC support
+          publish: proto run npm -- exec changeset publish
           oidcAuth: true  # Enable OIDC authentication
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_LOGLEVEL: verbose
           # NPM_TOKEN not needed with OIDC trusted publishing
