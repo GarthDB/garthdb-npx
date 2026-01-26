@@ -1,5 +1,11 @@
 # garthdb
 
+## 2.0.0
+
+### Major Changes
+
+- a8f4e35: Test major version bump with OIDC publishing - breaking change test
+
 ## 1.1.0
 
 ### Minor Changes
