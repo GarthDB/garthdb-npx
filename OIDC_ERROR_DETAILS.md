@@ -260,3 +260,101 @@ npm warn This command requires you to be logged in to https://registry.npmjs.org
 - **Status**: ✅ Success
 - **Action**: `garthdb/changesets-action@v1.6.8` with `oidcAuth: true`
 - **Command**: `proto run npm -- run build && proto run npx -- changeset publish`
+
+---
+
+## Final Resolution - Actual Package Publication
+
+### Test 8: Repository URL Case Mismatch Discovery
+- **Workflow Runs**: 
+  - Without Proto: https://github.com/GarthDB/garthdb-npx/actions/runs/21342025707
+  - With Proto: https://github.com/GarthDB/garthdb-npx/actions/runs/21342025703
+- **Commit**: `b7ba488` - "test: add verbose logging to changeset publish"
+- **Date**: January 26, 2026
+- **Result**: ❌ FAILED (but revealed critical issues)
+- **Error (non-proto)**: `422 Unprocessable Entity - Error verifying sigstore provenance bundle: Failed to validate repository information: package.json: "repository.url" is "git+https://github.com/garthdb/garthdb-npx.git", expected to match "https://github.com/GarthDB/garthdb-npx" from provenance`
+- **Error (proto)**: `ENEEDAUTH` - npm 10.8.2 (Node-bundled) was being used instead of npm 11.6.2
+- **Key Findings**:
+  1. ✅ OIDC authentication **worked** for non-proto workflow! (Token exchange succeeded, provenance statement published)
+  2. ❌ Publish failed due to repository URL case mismatch (lowercase `garthdb` vs `GarthDB`)
+  3. ❌ Proto workflow was using `npm@10.8.2` (Node-bundled) via `npx`, not `npm@11.6.2` (proto-managed)
+  4. npm 10.8.2 does not support OIDC (requires npm 11.5.1+)
+
+### Test 9: Complete Success - Fixed Repository URL + npm Version
+- **Workflow Runs**: 
+  - Without Proto: https://github.com/GarthDB/garthdb-npx/actions/runs/21342058326 ✅
+  - With Proto: https://github.com/GarthDB/garthdb-npx/actions/runs/21342073331 ✅
+- **Commits**: 
+  - `f6b9e4b` - "fix: correct repository URL case for provenance verification"
+  - `124b9ed` - "fix: use proto npm exec instead of npx to ensure npm 11.6.2 is used"
+- **Date**: January 26, 2026
+- **Result**: ✅ **COMPLETE SUCCESS - PACKAGE PUBLISHED**
+- **Fixes Applied**:
+  1. **Repository URL Case**: Updated package.json repository URL from `https://github.com/garthdb/garthdb-npx.git` to `https://github.com/GarthDB/garthdb-npx.git` to match exact GitHub repository name
+  2. **Proto npm Version**: Changed proto workflow from `proto run npx -- changeset publish` to `proto run npm -- exec changeset publish` to ensure npm 11.6.2 (proto-managed) is used instead of npm 10.8.2 (Node-bundled)
+- **Published**: `garthdb@1.0.2` with full provenance attestation and cryptographic signatures
+- **Verification**: 
+  - Package: https://www.npmjs.com/package/garthdb/v/1.0.2
+  - Attestations: https://registry.npmjs.org/-/npm/v1/attestations/garthdb@1.0.2
+  - Provenance: SLSA provenance predicate with GitHub Actions workflow information
+
+## Critical Learnings
+
+### Issue 1: Case-Sensitive Repository URL Matching
+**Problem**: npm's provenance verification requires exact case matching between package.json `repository.url` and the actual GitHub repository name.
+
+**Error**: `422 Unprocessable Entity - Error verifying sigstore provenance bundle`
+
+**Solution**: Ensure package.json repository URL matches the exact case of the GitHub repository (e.g., `GarthDB` not `garthdb`).
+
+### Issue 2: Proto's npx Uses Node-Bundled npm
+**Problem**: When using `proto run npx`, it executes using Node's bundled npm (10.8.2 with Node 20.17.0) instead of proto's managed npm (11.6.2). npm 10.8.2 does not support OIDC trusted publishing.
+
+**Error**: `ENEEDAUTH This command requires you to be logged in`
+
+**Solution**: Use `proto run npm -- exec <command>` instead of `proto run npx -- <command>` to ensure proto's npm version is used.
+
+### Working Configuration
+
+Both workflows now successfully publish with OIDC:
+
+**Without Proto** (`release.yml`):
+```yaml
+- name: Setup Node.js
+  uses: actions/setup-node@v4
+  with:
+    node-version: '20.17.0'
+    # Do NOT set registry-url - it enables token-based auth
+
+- name: Install npm 11.6.2
+  run: npm install -g npm@11.6.2
+
+- name: Create Release Pull Request or Publish
+  uses: garthdb/changesets-action@v1.6.8
+  with:
+    publish: npx changeset publish --verbose
+    oidcAuth: true
+```
+
+**With Proto** (`release-with-proto.yml`):
+```yaml
+- name: Setup proto toolchain
+  uses: moonrepo/setup-toolchain@v0
+  with:
+    auto-install: true
+
+- name: Create Release Pull Request or Publish
+  uses: garthdb/changesets-action@v1.6.8
+  with:
+    # Use 'npm exec' instead of 'npx' to ensure proto's npm is used
+    publish: proto run npm -- exec changeset publish --verbose
+    oidcAuth: true
+```
+
+## Final Status
+
+✅ **OIDC trusted publishing fully operational**
+✅ **Package published with provenance attestation**
+✅ **Both proto and non-proto workflows working**
+✅ **All security features enabled (signatures, attestations, SLSA provenance)**
+
