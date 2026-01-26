@@ -1,9 +1,20 @@
-name: Release
+name: Release (Proto Test)
+
+# This workflow is for testing OIDC publishing with proto toolchain manager
+# It's manually triggered to avoid conflicts with the main release workflow
+# Use this to verify proto + OIDC compatibility
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:  # Manual trigger only
+    inputs:
+      test_mode:
+        description: 'Run in test mode (dry-run only)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 permissions:
   contents: write
@@ -31,31 +42,11 @@ jobs:
       - name: Build
         run: proto run npm -- run build
 
-      - name: Debug OIDC Environment Variables
+      - name: Verify npm version
         run: |
-          echo "=== OIDC Environment Variables ==="
-          echo "ACTIONS_ID_TOKEN_REQUEST_URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-NOT SET}"
-          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN present: $([ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ] && echo "YES" || echo "NO")"
-          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN length: ${#ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
-          echo ""
-          echo "=== npm Configuration ==="
           echo "npm version: $(proto run npm -- --version)"
-          echo "npm path (via proto run): $(which npm || echo 'N/A')"
-          echo ""
-          echo "=== Environment Variables (filtered) ==="
-          env | grep -i "ACTIONS\|NPM\|NODE" | sort || true
-
-      - name: Debug npm publish (dry-run)
-        run: |
-          echo "=== Testing npm publish with dry-run (via proto run) ==="
-          proto run npm -- publish --dry-run 2>&1 || echo "Exit code: $?"
-        continue-on-error: true
-
-      - name: Debug npm whoami (check auth status)
-        run: |
-          echo "=== Checking npm authentication status (via proto run) ==="
-          proto run npm -- whoami 2>&1 || echo "Not authenticated (exit code: $?)"
-        continue-on-error: true
+          echo "node version: $(proto run node -- --version)"
+          echo "Expected: npm 11.6.2+ for OIDC support"
 
       - name: Create Release Pull Request or Publish
         uses: garthdb/changesets-action@v1.6.8

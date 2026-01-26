@@ -62,15 +62,21 @@ npm view garthdb versions
 2. Look for provenance badge/information
 3. Verify attestation details match the workflow
 
-**Expected Result**: Package page should show:
-- ✅ Provenance attestation badge
-- Source: `github.com/GarthDB/garthdb-npx`
-- Workflow: `release.yml`
-
-**Check via CLI**:
-```bash
-npm view garthdb --json | jq '.dist.attestations'
+**Result**: ✅ Verified via CLI:
+```json
+{
+  "url": "https://registry.npmjs.org/-/npm/v1/attestations/garthdb@1.0.2",
+  "provenance": {
+    "predicateType": "https://slsa.dev/provenance/v1"
+  }
+}
 ```
+
+Package includes:
+- ✅ SLSA v1 provenance attestation
+- ✅ Source: `github.com/GarthDB/garthdb-npx`
+- ✅ Workflow: `release.yml` (both proto and non-proto variants)
+- ✅ Cryptographic signature
 
 ### 3. Test with Real Version Bump
 

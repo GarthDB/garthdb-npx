@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   release:
-    name: Release without Proto
+    name: Release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -37,48 +37,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Debug OIDC Environment Variables
-        run: |
-          echo "=== OIDC Environment Variables ==="
-          echo "ACTIONS_ID_TOKEN_REQUEST_URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-NOT SET}"
-          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN present: $([ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ] && echo "YES" || echo "NO")"
-          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN length: ${#ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
-          echo ""
-          echo "=== npm Configuration ==="
-          echo "npm version: $(npm --version)"
-          echo "npm path: $(which npm)"
-          echo ""
-          echo "=== Environment Variables (filtered) ==="
-          env | grep -i "ACTIONS\|NPM\|NODE" | sort || true
-
-      - name: Debug npm publish (dry-run)
-        run: |
-          echo "=== Testing npm publish with dry-run (without proto) ==="
-          npm publish --dry-run 2>&1 || echo "Exit code: $?"
-        continue-on-error: true
-
-      - name: Debug npm whoami (check auth status)
-        run: |
-          echo "=== Checking npm authentication status (without proto) ==="
-          npm whoami 2>&1 || echo "Not authenticated (exit code: $?)"
-        continue-on-error: true
-
-      - name: Debug direct npm publish (test OIDC)
-        run: |
-          echo "=== Testing direct npm publish with OIDC ==="
-          echo "OIDC URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-NOT SET}"
-          echo "OIDC Token present: $([ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ] && echo "YES" || echo "NO")"
-          npm publish --dry-run 2>&1 | tail -10
-        continue-on-error: true
-
       - name: Create Release Pull Request or Publish
         uses: garthdb/changesets-action@v1.6.8
         with:
-          publish: npx changeset publish --verbose
-          oidcAuth: true  # Enable OIDC authentication
+          publish: npx changeset publish
+          oidcAuth: true  # Enable OIDC authentication for npm trusted publishing
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_LOGLEVEL: verbose
           # NPM_TOKEN not needed with OIDC trusted publishing
