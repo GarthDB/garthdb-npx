@@ -1,5 +1,11 @@
 # garthdb
 
+## 1.1.0
+
+### Minor Changes
+
+- 474395d: Test minor version bump with OIDC publishing - adds new feature capability
+
 ## 1.0.2
 
 ### Patch Changes
