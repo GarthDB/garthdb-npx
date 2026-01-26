@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/garthdb/garthdb-npx.git"
+    "url": "https://github.com/GarthDB/garthdb-npx.git"
   },
   "scripts": {
     "prepublish": "npm run build",
