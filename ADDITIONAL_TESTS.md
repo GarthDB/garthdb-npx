@@ -18,7 +18,7 @@ While we've successfully resolved the OIDC authentication issue with proto, ther
 
 ### 1. Verify Actual Package Publication
 
-**Status**: ⏳ NOT TESTED
+**Status**: ✅ COMPLETED (Test 9)
 
 **Why**: The workflows succeeded, but we didn't verify if the package actually published to npm.
 
@@ -43,11 +43,17 @@ git push
 npm view garthdb versions
 ```
 
-**Expected Result**: Version 1.0.2 (or next version) should appear on npm with provenance attestation.
+**Result**: ✅ `garthdb@1.0.2` published successfully with full provenance attestation.
+
+**Published**: January 26, 2026 at 00:13:30 UTC
+- Package: https://www.npmjs.com/package/garthdb/v/1.0.2
+- Attestations: https://registry.npmjs.org/-/npm/v1/attestations/garthdb@1.0.2
+- SLSA provenance: `https://slsa.dev/provenance/v1`
+- Cryptographic signatures: 1
 
 ### 2. Verify Provenance Attestation
 
-**Status**: ⏳ NOT TESTED
+**Status**: ✅ COMPLETED
 
 **Why**: OIDC should automatically generate provenance attestation. We should verify this is working.
 
