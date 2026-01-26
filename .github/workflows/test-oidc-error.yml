@@ -1,0 +1,70 @@
+name: Test OIDC Error Handling
+
+# This workflow intentionally omits id-token: write permission
+# to test error handling when OIDC is misconfigured
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_scenario:
+        description: 'Error scenario to test'
+        required: true
+        default: 'missing-id-token-permission'
+        type: choice
+        options:
+          - 'missing-id-token-permission'
+          - 'dry-run-only'
+
+permissions:
+  contents: read
+  # Intentionally missing: id-token: write
+
+jobs:
+  test-oidc-error:
+    name: Test OIDC Error
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.17.0'
+
+      - name: Install npm 11.6.2
+        run: npm install -g npm@11.6.2
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Check OIDC Environment Variables
+        run: |
+          echo "=== OIDC Environment Check ==="
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "❌ ACTIONS_ID_TOKEN_REQUEST_URL is NOT SET"
+            echo "This means id-token: write permission is missing"
+          else
+            echo "✅ ACTIONS_ID_TOKEN_REQUEST_URL is set"
+          fi
+          
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
+            echo "❌ ACTIONS_ID_TOKEN_REQUEST_TOKEN is NOT SET"
+          else
+            echo "✅ ACTIONS_ID_TOKEN_REQUEST_TOKEN is set"
+          fi
+
+      - name: Attempt npm publish (dry-run)
+        run: |
+          echo "=== Attempting npm publish without OIDC permissions ==="
+          npm publish --dry-run 2>&1 || true
+        continue-on-error: true
+
+      - name: Test Result
+        run: |
+          echo "=== Test Scenario: ${{ inputs.test_scenario }} ==="
+          echo "Expected: OIDC environment variables should be missing"
+          echo "Expected: npm publish should fail with authentication error"
