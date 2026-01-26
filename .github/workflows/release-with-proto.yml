@@ -60,8 +60,8 @@ jobs:
       - name: Create Release Pull Request or Publish
         uses: garthdb/changesets-action@v1.6.8
         with:
-          # Call changeset publish directly with proto (build already done in separate step)
-          publish: proto run npx -- changeset publish --verbose
+          # Use 'npm exec' instead of 'npx' to ensure proto's npm (11.6.2) is used, not Node's bundled npm
+          publish: proto run npm -- exec changeset publish --verbose
           oidcAuth: true  # Enable OIDC authentication
           title: "chore: version packages"
           commit: "chore: version packages"
