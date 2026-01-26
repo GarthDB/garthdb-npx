@@ -60,11 +60,12 @@ jobs:
       - name: Create Release Pull Request or Publish
         uses: garthdb/changesets-action@v1.6.8
         with:
-          # Call changeset publish directly with proto to reduce process nesting
-          publish: proto run npm -- run build && proto run npx -- changeset publish
+          # Call changeset publish directly with proto (build already done in separate step)
+          publish: proto run npx -- changeset publish --verbose
           oidcAuth: true  # Enable OIDC authentication
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_LOGLEVEL: verbose
           # NPM_TOKEN not needed with OIDC trusted publishing
